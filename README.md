@@ -1,5 +1,23 @@
 # Slack Channel Bot
 
+<div align="center" style="margin-bottom: 2rem;">
+  <img 
+    src="docs/assets/bot-profile.webp" 
+    alt="Slack Channel Bot Profile Picture" 
+    width="200" 
+    height="200" 
+    style="
+      border-radius: 50%;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+      border: 4px solid #ffffff;
+      margin-bottom: 1rem;
+    "
+  />
+  <p style="color: #666; font-size: 0.9rem; margin-top: 0.5rem;">
+    Your AI-powered Slack channel assistant
+  </p>
+</div>
+
 A Slack bot that answers questions about channel history using LLM (Large Language Model).
 
 ## Features
