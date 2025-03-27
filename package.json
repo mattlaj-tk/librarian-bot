@@ -8,10 +8,12 @@
     "dev": "nodemon src/server.js"
   },
   "dependencies": {
-    "@slack/bolt": "^3.17.0",
+    "@google/generative-ai": "^0.24.0",
+    "@slack/bolt": "^3.22.0",
     "@slack/web-api": "^7.0.0",
     "axios": "^1.6.7",
-    "dotenv": "^16.4.1"
+    "dotenv": "^16.4.7",
+    "openai": "^4.90.0"
   },
   "devDependencies": {
     "nodemon": "^3.0.3"

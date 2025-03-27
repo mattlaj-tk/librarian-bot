@@ -62,48 +62,70 @@ class SlackApiClient {
     }
   }
 
-  async searchMessages(query, page = 1, maxPages = 3) {
+  async searchMessages(channelId, topic, options = {}) {
+    const {
+      timeRange = '24h',
+      includeThreads = true
+    } = options;
+
     try {
-      // Extract search terms from query (remove channel specifier and quotes)
-      const searchTerms = query.replace(/in:\S+\s*/, '').replace(/['"]/g, '').trim().toLowerCase();
+      // Calculate timestamp for time range
+      const now = Math.floor(Date.now() / 1000);
+      const timeRanges = {
+        '24h': 24 * 60 * 60,
+        '7d': 7 * 24 * 60 * 60,
+        '30d': 30 * 24 * 60 * 60
+      };
+      const oldest = now - (timeRanges[timeRange] || timeRanges['24h']);
 
       // Get channel history
       const result = await this.client.conversations.history({
-        channel: query.match(/in:(\S+)/)?.[1] || '',
-        limit: 100 // Maximum allowed by Slack API
+        channel: channelId,
+        oldest: oldest.toString(),
+        limit: 100
       });
 
-      if (!result.messages) {
-        throw new Error('Invalid response format from Slack API');
+      // Filter messages by topic
+      const messages = result.messages.filter(msg => {
+        const text = msg.text.toLowerCase();
+        const searchTerms = topic.toLowerCase().split(' ');
+        return searchTerms.every(term => text.includes(term));
+      });
+
+      // Get thread messages if needed
+      if (includeThreads) {
+        const threadPromises = messages
+          .filter(msg => msg.thread_ts)
+          .map(msg => this.getThreadMessages(channelId, msg.thread_ts));
+        
+        const threadResults = await Promise.all(threadPromises);
+        const threadMessages = threadResults.flat();
+
+        // Filter thread messages by topic
+        const filteredThreadMessages = threadMessages.filter(msg => {
+          const text = msg.text.toLowerCase();
+          const searchTerms = topic.toLowerCase().split(' ');
+          return searchTerms.every(term => text.includes(term));
+        });
+
+        messages.push(...filteredThreadMessages);
       }
 
-      // Filter messages client-side based on search terms
-      const matches = result.messages.filter(msg => {
-        const messageText = msg.text.toLowerCase();
-        return searchTerms.split(' ').every(term => messageText.includes(term));
-      });
-
-      // Add permalink to each message
-      const messagesWithPermalinks = await Promise.all(matches.map(async msg => {
-        try {
-          const permalink = await this.client.chat.getPermalink({
-            channel: query.match(/in:(\S+)/)?.[1] || '',
-            message_ts: msg.ts
-          });
-          return { ...msg, permalink: permalink.permalink };
-        } catch (error) {
-          console.error('Error getting permalink:', error);
-          return { ...msg, permalink: '' };
-        }
+      // Format messages with permalinks
+      const formattedMessages = await Promise.all(messages.map(async msg => {
+        const permalink = await this.getPermalink(channelId, msg.ts);
+        return {
+          text: msg.text,
+          username: msg.user,
+          ts: msg.ts,
+          permalink,
+          thread_ts: msg.thread_ts
+        };
       }));
 
-      return messagesWithPermalinks;
+      return formattedMessages;
+
     } catch (error) {
-      if (error.data?.error === 'rate_limited') {
-        const retryAfter = error.data.retry_after || 1;
-        await this.sleep(retryAfter * 1000);
-        return this.searchMessages(query, page, maxPages);
-      }
       console.error('Error searching messages:', error);
       throw error;
     }
@@ -111,66 +133,44 @@ class SlackApiClient {
 
   async getThreadMessages(channelId, threadTs) {
     try {
-      // If threadTs is not provided, return empty array
-      if (!threadTs) {
-        return [];
-      }
-
       const result = await this.client.conversations.replies({
         channel: channelId,
         ts: threadTs
       });
 
-      if (!result.messages) {
-        throw new Error('Invalid response format from Slack API');
-      }
-
-      // The first message is the parent message, which we don't need
-      return result.messages.slice(1);
+      return result.messages;
     } catch (error) {
-      if (error.data?.error === 'rate_limited') {
-        const retryAfter = error.data.retry_after || 1;
-        await this.sleep(retryAfter * 1000);
-        return this.getThreadMessages(channelId, threadTs);
-      }
-      if (error.data?.error === 'thread_not_found') {
-        return [];
-      }
       console.error('Error getting thread messages:', error);
       throw error;
     }
   }
 
+  async getPermalink(channelId, messageTs) {
+    try {
+      const result = await this.client.chat.getPermalink({
+        channel: channelId,
+        message_ts: messageTs
+      });
+      return result.permalink;
+    } catch (error) {
+      console.error('Error getting permalink:', error);
+      return null;
+    }
+  }
+
   async validateChannelAccess(channelId) {
     try {
-      // Get channel info to check if it's private
-      const channelInfo = await this.client.conversations.info({
+      await this.client.conversations.info({
         channel: channelId
       });
-
-      const isPrivate = channelInfo.channel.is_private;
-      
-      // Check if private channels are allowed
-      if (isPrivate && !config.allowPrivateChannels) {
-        throw new Error('Access to private channels is not allowed');
-      }
-
-      // If channel is whitelisted, allow access
-      if (config.allowedChannels.includes(channelId)) {
-        return true;
-      }
-
-      // If all public channels are allowed and this is a public channel
-      if (config.allowAllPublicChannels && !isPrivate) {
-        return true;
-      }
-
-      throw new Error('Access to this channel is not allowed');
+      return true;
     } catch (error) {
-      console.error('Error validating channel access:', error);
+      if (error.message.includes('not_allowed')) {
+        throw new Error('Channel access not allowed');
+      }
       throw error;
     }
   }
 }
 
-module.exports = SlackApiClient; 
+module.exports = new SlackApiClient(process.env.SLACK_BOT_TOKEN); 

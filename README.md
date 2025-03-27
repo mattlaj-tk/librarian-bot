@@ -63,35 +63,118 @@ A Slack bot that answers questions about channel history using LLM (Large Langua
 
 ## Usage
 
-Use the `/librarian` slash command in any channel or DM the bot directly:
+The bot provides an intuitive interface through slash commands and interactive components:
 
-### 1. Search for Topic Discussions
+### 1. Quick Search
 ```
-/librarian tell me more about 'release dates'
+/librarian
 ```
-The bot will:
-1. Verify you're a member of the channel
-2. Search through recent messages (up to 100) for the specified topic
-3. Use LLM to summarize the relevant messages
-4. Respond with an ephemeral message containing the summary and links to original messages
+This opens an interactive modal where you can:
+- Enter your search topic
+- Select the time range (last 24h, 7d, 30d)
+- Choose to include thread messages
+- Preview results before sending
 
-Note: The search is performed on the most recent messages in the channel and uses exact text matching for reliability.
+### 2. Direct Topic Search
+```
+/librarian search <topic>
+```
+For quick searches without the modal:
+```
+/librarian search release dates
+/librarian search "bug fix"
+```
 
-### 2. Add Context to Threads
+### 3. Thread Context
 ```
-/librarian add context
+/librarian context
 ```
-Use this command in a thread to:
+When used in a thread, the bot will:
 1. Analyze the current thread discussion
 2. Find related discussions in the channel
 3. Provide additional context and links to relevant messages
 4. Help maintain conversation continuity
 
-### 3. Direct Message Queries
-You can also DM the bot directly to ask questions about channels you're a member of. The bot will:
+### 4. Direct Message Queries
+DM the bot directly to ask questions about channels you're a member of:
+```
+summarize release dates from last 2 days
+```
+The bot will:
 1. Verify your membership in the queried channel
 2. Search and summarize relevant messages
 3. Respond privately in the DM conversation
+
+### Command Examples
+
+1. **Basic Search**:
+   ```
+   /librarian search release dates
+   ```
+
+2. **Search with Time Range**:
+   ```
+   /librarian search "bug fix" --time 7d
+   ```
+
+3. **Thread Context**:
+   ```
+   /librarian context
+   ```
+   (Must be used within a thread)
+
+4. **Interactive Search**:
+   ```
+   /librarian
+   ```
+   (Opens interactive modal)
+
+### Interactive Components
+
+The bot uses Slack's Block Kit to provide a rich, interactive experience:
+
+1. **Search Modal**:
+   - Topic input field
+   - Time range selector
+   - Thread inclusion toggle
+   - Preview section
+   - Search button
+
+2. **Results View**:
+   - Collapsible sections
+   - Message permalinks
+   - Thread expansion
+   - Related topics
+   - Action buttons for follow-up
+
+3. **Error Handling**:
+   - Clear error messages
+   - Suggestions for correction
+   - Help button for guidance
+
+### Command Best Practices
+
+1. **Shortcuts**:
+   - `/librarian` for full interface
+   - `/librarian search` for quick search
+   - `/librarian context` for thread context
+
+2. **Natural Language**:
+   - Support for quoted and unquoted topics
+   - Optional time range specification
+   - Flexible word order
+
+3. **Feedback**:
+   - Immediate acknowledgment
+   - Progress indicators
+   - Clear error messages
+   - Helpful suggestions
+
+4. **Accessibility**:
+   - Keyboard navigation
+   - Screen reader support
+   - High contrast options
+   - Clear visual hierarchy
 
 ## Search Behavior
 

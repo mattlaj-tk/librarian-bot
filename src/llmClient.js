@@ -1,14 +1,10 @@
-const axios = require('axios');
 const config = require('../config/config');
 
 /**
- * Client for interacting with the LLM API
+ * Base LLM client that can be extended for different providers
  */
 class LLMClient {
-  constructor(apiKey) {
-    this.apiKey = apiKey;
-    this.apiUrl = process.env.LLM_API_URL || 'https://api.openai.com/v1/chat/completions';
-    
+  constructor() {
     // Load configuration
     this.maxTokens = config.llm.maxTokens;
     this.maxResponseTokens = config.llm.maxResponseTokens;
@@ -100,9 +96,10 @@ class LLMClient {
    */
   formatPrompt(messages, query) {
     // Format messages with metadata
-    const formattedMessages = messages.map(msg => 
-      `[${msg.user}, ${new Date(msg.ts * 1000).toLocaleString()}]: ${msg.text}`
-    ).join('\n');
+    const formattedMessages = messages.map(msg => {
+      const timestamp = new Date(msg.ts * 1000).toLocaleString();
+      return `${msg.username} (${timestamp}): ${msg.text}`;
+    }).join('\n\n');
 
     // Use template from config
     return config.prompts.messageContext
@@ -155,76 +152,13 @@ class LLMClient {
   }
 
   /**
-   * Make a request to the LLM API
-   * @param {string} prompt - The prompt to send
-   * @param {number} retryCount - Current retry attempt
-   * @returns {Promise<string[]>} Array of response chunks
-   */
-  async makeRequest(prompt, retryCount = 0) {
-    try {
-      await this.enforceRateLimit();
-
-      const response = await axios.post(
-        this.apiUrl,
-        {
-          model: "gpt-3.5-turbo",
-          messages: [
-            config.prompts.summarizer,
-            {
-              role: "user",
-              content: prompt
-            }
-          ],
-          max_tokens: this.maxResponseTokens,
-          temperature: config.llm.temperature
-        },
-        {
-          headers: {
-            'Authorization': `Bearer ${this.apiKey}`,
-            'Content-Type': 'application/json'
-          },
-          timeout: 30000 // 30 second timeout
-        }
-      );
-
-      const responseText = response.data.choices[0].message.content;
-      return this.chunkResponse(responseText);
-    } catch (error) {
-      const shouldRetry = await this.handleError(error, retryCount);
-      if (shouldRetry) {
-        return this.makeRequest(prompt, retryCount + 1);
-      }
-      throw error;
-    }
-  }
-
-  /**
    * Summarize channel messages
    * @param {Array} messages - Array of Slack messages
-   * @param {string} query - User's query
-   * @returns {Promise<string[]>} Array of summary chunks
+   * @param {string} topic - User's query
+   * @returns {Promise<string>} Summary text
    */
-  async summarizeContext(messages, query) {
-    try {
-      // If in debug mode, return debug response
-      if (config.debugMode) {
-        return ['Hello World! This is a debug response.'];
-      }
-
-      // Format the prompt
-      const prompt = this.formatPrompt(messages, query);
-
-      // Calculate approximate tokens (rough estimate: 1 token ≈ 4 characters)
-      const estimatedTokens = Math.ceil(prompt.length / 4);
-      
-      if (estimatedTokens > this.maxTokens) {
-        throw new Error('Context too large for the model. Please try a more specific query or shorter time range.');
-      }
-
-      return await this.makeRequest(prompt);
-    } catch (error) {
-      throw error;
-    }
+  async summarizeContext(messages, topic) {
+    throw new Error('summarizeContext must be implemented by the provider');
   }
 
   /**
@@ -233,50 +167,7 @@ class LLMClient {
    * @returns {Promise<string[]>} Array of topics
    */
   async extractTopics(text) {
-    try {
-      // If in debug mode, return debug topics
-      if (config.debugMode) {
-        return ['debug topic 1', 'debug topic 2', 'debug topic 3'];
-      }
-
-      await this.enforceRateLimit();
-
-      // Use template from config
-      const prompt = config.prompts.topicExtraction.replace('{text}', text);
-
-      const response = await axios.post(
-        this.apiUrl,
-        {
-          model: "gpt-3.5-turbo",
-          messages: [
-            config.prompts.topicExtractor,
-            {
-              role: "user",
-              content: prompt
-            }
-          ],
-          max_tokens: 200,
-          temperature: config.llm.topicTemperature
-        },
-        {
-          headers: {
-            'Authorization': `Bearer ${this.apiKey}`,
-            'Content-Type': 'application/json'
-          },
-          timeout: 30000
-        }
-      );
-
-      const topics = response.data.choices[0].message.content
-        .split(',')
-        .map(topic => topic.trim())
-        .filter(topic => topic.length > 0);
-
-      return topics;
-    } catch (error) {
-      console.error('Error extracting topics:', error);
-      throw error;
-    }
+    throw new Error('extractTopics must be implemented by the provider');
   }
 
   /**
@@ -290,4 +181,5 @@ class LLMClient {
   }
 }
 
-module.exports = LLMClient; 
+// Export a placeholder client that will be replaced with the actual provider implementation
+module.exports = new LLMClient(); 
