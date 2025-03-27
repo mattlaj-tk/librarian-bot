@@ -250,12 +250,12 @@ Once running, you can test the bot with:
 
 1. **Topic Search**:
    ```
-   /librarian tell me more about 'your topic'
+   /librarian search <your topic>
    ```
 
 2. **Thread Context**:
    ```
-   /librarian add context
+   /librarian context
    ```
    (Must be used within a thread)
 
