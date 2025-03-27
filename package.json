@@ -1,0 +1,19 @@
+{
+  "name": "slack-channel-bot",
+  "version": "1.0.0",
+  "description": "A Slack bot that answers questions about channel history using LLM",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "nodemon src/server.js"
+  },
+  "dependencies": {
+    "@slack/bolt": "^3.17.0",
+    "@slack/web-api": "^7.0.0",
+    "axios": "^1.6.7",
+    "dotenv": "^16.4.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.3"
+  }
+}
