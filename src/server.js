@@ -1,5 +1,6 @@
 const { App } = require('@slack/bolt');
 require('dotenv').config();
+const config = require('../config/config');
 
 // Import command handlers
 const { registerSlashCommands } = require('./slashCommands');
@@ -11,6 +12,7 @@ console.log('- SLACK_BOT_TOKEN:', process.env.SLACK_BOT_TOKEN ? 'Present' : 'Mis
 console.log('- SLACK_SIGNING_SECRET:', process.env.SLACK_SIGNING_SECRET ? 'Present' : 'Missing');
 console.log('- SLACK_APP_TOKEN:', process.env.SLACK_APP_TOKEN ? 'Present' : 'Missing');
 console.log('- LLM_API_KEY:', process.env.LLM_API_KEY ? 'Present' : 'Missing');
+console.log('- Debug Mode:', config.debugMode ? 'Enabled' : 'Disabled');
 
 const app = new App({
   token: process.env.SLACK_BOT_TOKEN,

@@ -158,6 +158,14 @@ class LLMClient {
    * @returns {Promise<string>} Summary text
    */
   async summarizeContext(messages, topic) {
+    if (config.debugMode) {
+      console.log('Debug mode: Bypassing LLM call');
+      return `[DEBUG] Here's a test summary for "${topic}":\n\n` +
+        messages.slice(0, 3).map(msg => 
+          `- ${msg.username} (${new Date(msg.ts * 1000).toLocaleString()}): ${msg.text}`
+        ).join('\n\n') +
+        '\n\nThis is a debug response. Enable production mode to get real LLM summaries.';
+    }
     throw new Error('summarizeContext must be implemented by the provider');
   }
 
@@ -167,6 +175,10 @@ class LLMClient {
    * @returns {Promise<string[]>} Array of topics
    */
   async extractTopics(text) {
+    if (config.debugMode) {
+      console.log('Debug mode: Bypassing LLM call');
+      return ['debug-topic-1', 'debug-topic-2', 'debug-topic-3'];
+    }
     throw new Error('extractTopics must be implemented by the provider');
   }
 

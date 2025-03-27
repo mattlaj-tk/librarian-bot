@@ -1,5 +1,5 @@
 const { WebClient } = require('@slack/web-api');
-const config = require('./config');
+const config = require('../config/config');
 
 class SlackApiClient {
   constructor(token) {
@@ -63,6 +63,28 @@ class SlackApiClient {
   }
 
   async searchMessages(channelId, topic, options = {}) {
+    // Return test messages in debug mode
+    if (config.debugMode) {
+      console.log('Debug mode: Returning test messages');
+      return [
+        {
+          ts: Math.floor(Date.now() / 1000),
+          text: `Test message about ${topic} from the past hour`,
+          username: 'test_user1'
+        },
+        {
+          ts: Math.floor(Date.now() / 1000) - 3600,
+          text: `Another test message discussing ${topic}`,
+          username: 'test_user2'
+        },
+        {
+          ts: Math.floor(Date.now() / 1000) - 7200,
+          text: `Here's a third test message about ${topic}`,
+          username: 'test_user3'
+        }
+      ];
+    }
+
     const {
       timeRange = '24h',
       includeThreads = true
@@ -173,4 +195,13 @@ class SlackApiClient {
   }
 }
 
-module.exports = new SlackApiClient(process.env.SLACK_BOT_TOKEN); 
+// Create and export an instance
+const slackClient = new SlackApiClient(process.env.SLACK_BOT_TOKEN);
+
+module.exports = {
+  searchMessages: (channelId, topic, options) => slackClient.searchMessages(channelId, topic, options),
+  isMember: (userId, channelId) => slackClient.isMember(userId, channelId),
+  getThreadMessages: (channelId, threadTs) => slackClient.getThreadMessages(channelId, threadTs),
+  getPermalink: (channelId, messageTs) => slackClient.getPermalink(channelId, messageTs),
+  validateChannelAccess: (channelId) => slackClient.validateChannelAccess(channelId)
+}; 
