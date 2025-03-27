@@ -365,25 +365,3 @@ const config = {
    ```
 4. Test the changes
 5. Monitor logs for any issues
-
-### Configuration Best Practices
-
-1. **Channel Access**:
-   - Start restrictive (specific channels only)
-   - Expand access gradually
-   - Always test in a private channel first
-
-2. **Rate Limiting**:
-   - Set conservative limits initially
-   - Monitor API usage
-   - Adjust based on actual usage patterns
-
-3. **LLM Settings**:
-   - Keep `maxTokens` within model limits
-   - Use lower temperatures for more focused responses
-   - Implement retries for reliability
-
-4. **Debug Mode**:
-   - Enable during development
-   - Disable for production
-   - Use for testing configuration changes 
