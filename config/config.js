@@ -1,20 +1,18 @@
 // Configuration for the Slack Channel Bot
 const config = {
   // List of channel IDs that the bot is allowed to access
-  allowedChannels: [
-    // Add your channel IDs here
-    // Example: 'C0123456789'
-    'C08KR31BWDR',
-    'C08CH9P52C9',
-    'C08BXQSQFRC'
-    // Added from error message
-  ],
+  allowedChannels: process.env.ALLOWED_CHANNEL_IDS ? 
+    process.env.ALLOWED_CHANNEL_IDS.split(',') : 
+    [
+      // Default channels if environment variable is not set
+      // Example: 'C0123456789'
+    ],
   
   // Whether to allow access to all public channels (false = only whitelisted channels)
-  allowAllPublicChannels: false,
+  allowAllPublicChannels: process.env.ALLOW_ALL_PUBLIC_CHANNELS === 'true',
   
   // Whether to allow access to private channels (false = only public channels)
-  allowPrivateChannels: true,
+  allowPrivateChannels: process.env.ALLOW_PRIVATE_CHANNELS === 'true',
 
   // Search Configuration
   search: {

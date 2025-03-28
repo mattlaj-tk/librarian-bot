@@ -47,6 +47,9 @@ A Slack bot that answers questions about channel history using LLM (Large Langua
    SLACK_APP_TOKEN=xapp-your-app-token
    LLM_API_KEY=your-llm-api-key
    LLM_API_URL=https://api.openai.com/v1/chat/completions
+   ALLOWED_CHANNEL_IDS=CXXXXXXXXXX,CXXXXXXXXXX
+   ALLOW_ALL_PUBLIC_CHANNELS=false
+   ALLOW_PRIVATE_CHANNELS=true
    ```
 4. Configure your Slack App in the [Slack Developer Portal](https://api.slack.com/apps):
    - Create a new app
@@ -59,6 +62,7 @@ A Slack bot that answers questions about channel history using LLM (Large Langua
      - `channels:read` (for channel access validation)
      - `groups:read` (for private channel access validation)
      - `im:read` (for DM support)
+     - `connections:write` (for Socket Mode)
    - Enable Socket Mode in app settings
    - Create slash command `/librarian`
    - Install app to workspace
@@ -86,6 +90,7 @@ For quick searches without the modal:
 ```
 /librarian search release dates
 /librarian search "bug fix"
+/librarian search project updates --no-threads
 ```
 
 ### 3. Public Context Search
@@ -245,6 +250,9 @@ The bot uses Slack's Socket Mode for development, which means:
    SLACK_APP_TOKEN=xapp-your-app-token
    LLM_API_KEY=your-llm-api-key
    LLM_API_URL=https://api.openai.com/v1/chat/completions
+   ALLOWED_CHANNEL_IDS=C0123456789,C9876543210
+   ALLOW_ALL_PUBLIC_CHANNELS=false
+   ALLOW_PRIVATE_CHANNELS=true
    ```
 
 4. **Start Development Server**:
@@ -341,58 +349,46 @@ The bot's behavior is controlled through `config/config.js`. This centralized co
 
 ### Channel Access Control
 
-Control which channels the bot can access:
+Control which channels the bot can access through environment variables:
 
-```javascript
-{
-  // List of channel IDs that the bot is allowed to access
-  allowedChannels: [
-    // Add your channel IDs here
-    'C0123456789',  // #general
-    'C9876543210'   // #team-updates
-  ],
-  
-  // Whether to allow access to all public channels
-  allowAllPublicChannels: false,
-  
-  // Whether to allow access to private channels
-  allowPrivateChannels: true
-}
+```
+# Comma-separated list of channel IDs the bot is allowed to access
+ALLOWED_CHANNEL_IDS=C0123456789,C9876543210
+
+# Whether to allow access to all public channels (true/false)
+ALLOW_ALL_PUBLIC_CHANNELS=false
+
+# Whether to allow access to private channels (true/false)
+ALLOW_PRIVATE_CHANNELS=true
 ```
 
 #### Channel Whitelisting Options:
 
 1. **Specific Channels Only**:
-   ```javascript
-   {
-     allowedChannels: ['C0123456789'],
-     allowAllPublicChannels: false,
-     allowPrivateChannels: false
-   }
+   ```
+   ALLOWED_CHANNEL_IDS=C0123456789
+   ALLOW_ALL_PUBLIC_CHANNELS=false
+   ALLOW_PRIVATE_CHANNELS=false
    ```
    - Bot only works in listed channels
    - Most restrictive option
    - Good for testing or limited deployments
 
 2. **All Public Channels**:
-   ```javascript
-   {
-     allowedChannels: [],
-     allowAllPublicChannels: true,
-     allowPrivateChannels: false
-   }
+   ```
+   ALLOWED_CHANNEL_IDS=
+   ALLOW_ALL_PUBLIC_CHANNELS=true
+   ALLOW_PRIVATE_CHANNELS=false
    ```
    - Bot works in all public channels
    - No access to private channels
    - Good for general deployment
 
 3. **Public + Selected Private**:
-   ```javascript
-   {
-     allowedChannels: ['C0123456789'], // private channel
-     allowAllPublicChannels: true,
-     allowPrivateChannels: true
-   }
+   ```
+   ALLOWED_CHANNEL_IDS=C0123456789
+   ALLOW_ALL_PUBLIC_CHANNELS=true
+   ALLOW_PRIVATE_CHANNELS=true
    ```
    - Bot works in all public channels
    - Only works in whitelisted private channels
@@ -415,17 +411,49 @@ Or use the bot to find channel IDs:
 /librarian channel info
 ```
 
+### Help Command
+```
+/librarian help
+```
+Shows available commands and usage instructions. Aliases: `/librarian ?`, `/librarian usage`, `/librarian commands`
+
 ### Complete Configuration Options
+
+Configuration is split between environment variables and the `config.js` file:
+
+#### Environment Variables (`.env`)
+
+```
+# Slack App Credentials
+SLACK_BOT_TOKEN=xoxb-your-bot-token
+SLACK_SIGNING_SECRET=your-signing-secret
+SLACK_APP_TOKEN=xapp-your-app-token
+
+# LLM Settings
+LLM_API_KEY=your-llm-api-key
+LLM_API_URL=https://api.openai.com/v1/chat/completions
+
+# Channel Access Control
+ALLOWED_CHANNEL_IDS=C0123456789,C9876543210
+ALLOW_ALL_PUBLIC_CHANNELS=false
+ALLOW_PRIVATE_CHANNELS=true
+```
+
+#### Application Configuration (`config/config.js`)
 
 ```javascript
 const config = {
-  // Channel Access
-  allowedChannels: ['C0123456789'],
-  allowAllPublicChannels: false,
-  allowPrivateChannels: true,
+  // Search Configuration
+  search: {
+    maxMessages: 500,        // Maximum number of messages to fetch
+    maxThreads: 5,          // Maximum number of threads to show in results
+    includeThreads: true,   // Whether to include thread messages by default
+    rateLimitDelay: 1000,   // Delay between API requests (ms)
+  },
 
   // LLM Settings
   llm: {
+    model: "gpt-3.5-turbo",
     maxTokens: 4000,          // Context window size
     maxResponseTokens: 500,   // Maximum response length
     maxRetries: 3,           // API retry attempts
@@ -441,22 +469,6 @@ const config = {
     maxRequestsPerMinute: 50 // Maximum API requests per minute
   },
 
-  // Prompts
-  prompts: {
-    // System prompts
-    summarizer: {
-      role: "system",
-      content: "You are a helpful assistant..."
-    },
-    topicExtractor: {
-      role: "system",
-      content: "You are a helpful assistant..."
-    },
-    // Message templates
-    messageContext: `Here are the relevant messages...`,
-    topicExtraction: `Analyze the following text...`
-  },
-
   // Debug Mode
   debugMode: false
 };
@@ -464,15 +476,21 @@ const config = {
 
 ### Applying Configuration Changes
 
-1. Edit `config/config.js`
-2. Save the file
-3. Restart the bot:
-   ```bash
-   # Stop the current process
-   Ctrl + C
+1. For environment variables:
+   - Edit `.env` file
+   - Save the file
+   - Restart the bot
 
-   # Start the bot again
-   npm run dev
-   ```
-4. Test the changes
-5. Monitor logs for any issues
+2. For application settings:
+   - Edit `config/config.js`
+   - Save the file
+   - Restart the bot:
+     ```bash
+     # Stop the current process
+     Ctrl + C
+
+     # Start the bot again
+     npm run dev
+     ```
+3. Test the changes
+4. Monitor logs for any issues
