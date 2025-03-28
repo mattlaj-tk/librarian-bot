@@ -311,27 +311,26 @@ Format the response in a clear, concise way that helps maintain conversation con
   }
   
   /**
-   * Generate concise summaries for a list of threads
-   * @param {Array} threads - Array of thread objects with messages
-   * @param {string} searchTopic - The original search topic
+   * Generate summaries for threads
+   * @param {Array} threads - Array of thread objects
+   * @param {string} searchTopic - User's search topic
+   * @param {Object} customSystemPrompt - Optional custom system prompt for context search
    * @returns {Promise<Array>} Array of thread summaries with permalinks
    */
-  async generateThreadSummaries(threads, searchTopic) {
+  async generateThreadSummaries(threads, searchTopic, customSystemPrompt = null) {
+    // Use debug mode if enabled
     if (config.debugMode) {
-      console.log('Debug mode: Bypassing LLM call');
-      
-      // Create valid debug thread summaries
-      return threads.slice(0, 3).map((thread, index) => {
-        // Ensure we have valid permalink and summary
-        return {
-          summary: `[DEBUG] This is a sample thread about "${searchTopic}" with ${thread.messages?.length || 0} messages.`,
-          permalink: thread.permalink || "https://slack.com",
-          relevanceScore: 0.9 - (index * 0.2)
-        };
-      });
+      console.log('Debug mode: Bypassing LLM call for thread summaries');
+      return threads.map((thread, i) => ({
+        summary: `[DEBUG] Thread summary ${i + 1} for "${searchTopic}" with ${thread.messages.length} messages`,
+        permalink: thread.permalink || "https://slack.com"
+      }));
     }
 
     try {
+      // Use the provided custom system prompt or default to the summarizer prompt
+      const systemPrompt = customSystemPrompt || config.prompts.summarizer;
+
       // Before calling LLM, prepare a list of permalinks to match with threads
       const threadPermalinks = threads.map((thread, index) => {
         return {
@@ -340,7 +339,7 @@ Format the response in a clear, concise way that helps maintain conversation con
         };
       });
       
-      const prompt = `Analyze these Slack threads and provide a one-sentence summary for each that captures the key point or decision. Focus on what makes each thread unique and valuable.
+      const prompt = `Analyze these Slack threads and provide a detailed summary for each that captures the key discussion points and context. The threads contain complete conversations, including messages that may not directly mention the search topic but provide important context.
 
 Search Topic: "${searchTopic}"
 
@@ -354,19 +353,23 @@ ${thread.messages.map(msg =>
 ).join('\n\n---\n\n')}
 
 For each thread, provide:
-1. A one-sentence summary that captures the key point or decision
+1. A comprehensive summary (2-3 sentences) that captures:
+   - The main discussion point
+   - How the conversation evolved
+   - Important decisions or conclusions reached
+   - Implicit connections to the search topic, even if keywords aren't mentioned
 2. The exact permalink as provided above (do not replace with placeholders)
 3. A relevance score (0-1) based on how directly it addresses the search topic
 
 Format each thread as:
-Summary: [one sentence]
+Summary: [2-3 sentences]
 Link: [exact permalink from above]
 Score: [0-1]
 
 Sort threads by relevance score.`;
 
       console.log('Calling LLM with prompt:', prompt.substring(0, 200) + '...');
-      const response = await this.callLLM(prompt);
+      const response = await this.callLLM(prompt, systemPrompt);
       
       // Parse the response but also ensure permalinks are valid
       const summaries = this.parseResponse(response, threads);

@@ -15,10 +15,14 @@ class OpenAIClient extends LLMClient {
   /**
    * Call the OpenAI API with the given prompt
    * @param {string} prompt - The prompt to send to the API
+   * @param {Object} systemPrompt - Optional custom system prompt
    * @returns {Promise<string>} The API response
    */
-  async callLLM(prompt) {
+  async callLLM(prompt, systemPrompt = null) {
     await this.enforceRateLimit();
+    
+    // Use the provided system prompt or default to the summarizer
+    const sysPrompt = systemPrompt || config.prompts.summarizer;
     
     let retryCount = 0;
     while (retryCount < this.maxRetries) {
@@ -26,7 +30,7 @@ class OpenAIClient extends LLMClient {
         const response = await this.client.chat.completions.create({
           model: config.llm.model,
           messages: [
-            { role: "system", content: config.prompts.summarizer.content },
+            { role: sysPrompt.role, content: sysPrompt.content },
             { role: "user", content: prompt }
           ],
           max_tokens: this.maxResponseTokens,
@@ -48,15 +52,43 @@ class OpenAIClient extends LLMClient {
    * Summarize channel messages
    * @param {Array} messages - Array of Slack messages
    * @param {string} topic - User's query
+   * @param {Object} systemPrompt - Optional custom system prompt
    * @returns {Promise<string>} Summary text
    */
-  async summarizeContext(messages, topic) {
+  async summarizeContext(messages, topic, systemPrompt = null) {
     if (config.debugMode) {
       return super.summarizeContext(messages, topic);
     }
 
     const prompt = this.formatPrompt(messages, topic);
-    return await this.callLLM(prompt);
+    
+    // Use the provided system prompt or default to the summarizer
+    const sysPrompt = systemPrompt || config.prompts.summarizer;
+    
+    await this.enforceRateLimit();
+    
+    let retryCount = 0;
+    while (retryCount < this.maxRetries) {
+      try {
+        const response = await this.client.chat.completions.create({
+          model: config.llm.model,
+          messages: [
+            { role: sysPrompt.role, content: sysPrompt.content },
+            { role: "user", content: prompt }
+          ],
+          max_tokens: this.maxResponseTokens * 2, // Double token limit for reports
+          temperature: config.llm.temperature
+        });
+
+        return response.choices[0].message.content;
+      } catch (error) {
+        const shouldRetry = await this.handleError(error, retryCount);
+        if (!shouldRetry) {
+          throw error;
+        }
+        retryCount++;
+      }
+    }
   }
 
   /**

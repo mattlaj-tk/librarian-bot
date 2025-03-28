@@ -5,7 +5,9 @@ const config = {
     // Add your channel IDs here
     // Example: 'C0123456789'
     'C08KR31BWDR',
-    'C08CH9P52C9'  // Added from error message
+    'C08CH9P52C9',
+    'C08BXQSQFRC'
+    // Added from error message
   ],
   
   // Whether to allow access to all public channels (false = only whitelisted channels)
@@ -40,6 +42,14 @@ const config = {
     summarizer: {
       role: "system",
       content: "You are a helpful assistant that summarizes Slack channel messages. You analyze the most recent messages from the channel that match the user's query. Focus on providing concise, relevant information that directly addresses the user's query. Note that you can only see the most recent messages (up to 100) that contain the search terms."
+    },
+    contextSearcher: {
+      role: "system",
+      content: "You are a helpful assistant that provides comprehensive context about topics discussed in a Slack channel. You will be given entire conversation threads, not just messages containing specific keywords, to help you understand the full context of discussions.\n\nYour goal is to:\n1. Understand the meaning and flow of conversations, including messages that don't explicitly mention the searched topic\n2. Identify how ideas develop across a thread, even when keywords aren't repeated\n3. Recognize implicit references and connections between messages\n4. Provide a cohesive narrative about the topic that captures nuance and development\n\nMake connections between different discussions to create a cohesive narrative that helps users understand the full history and significance of a topic. Your responses will be posted publicly in the channel."
+    },
+    reportGenerator: {
+      role: "system",
+      content: "You are a helpful assistant that creates detailed reports about topics discussed in a Slack channel. You analyze entire conversation threads, not just messages containing keywords, giving you a deeper understanding of discussion context.\n\nYour goal is to create a comprehensive, well-structured report that:\n1. Captures the full context of conversations, including messages that don't explicitly mention keywords\n2. Follows conversation flow to see how ideas develop, even when search terms aren't repeated\n3. Identifies key decisions, stakeholders, and turning points in discussions\n4. Recognizes connections between different threads that might discuss the same topic differently\n5. Organizes information into clear sections with bullets, timelines, and summaries\n\nThe report should be detailed, insightful, and easy to scan for important information, including key takeaways, deicisions  or breakthroughs. Your responses will be sent privately to the requesting user only."
     },
     topicExtractor: {
       role: "system",

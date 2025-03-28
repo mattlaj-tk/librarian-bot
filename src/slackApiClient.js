@@ -87,7 +87,8 @@ class SlackApiClient {
 
     const {
       includeThreads = config.search.includeThreads,
-      maxMessages = config.search.maxMessages
+      maxMessages = config.search.maxMessages,
+      includeFullThreads = options.includeFullThreads || false
     } = options;
 
     try {
@@ -131,21 +132,39 @@ class SlackApiClient {
 
       // Get thread messages if needed
       if (includeThreads) {
-        const threadPromises = messages
-          .filter(msg => msg.thread_ts)
-          .map(msg => this.getThreadMessages(channelId, msg.thread_ts));
+        const threadParents = new Set();
+        
+        // First, collect all thread parent timestamp IDs
+        messages.forEach(msg => {
+          if (msg.thread_ts) {
+            threadParents.add(msg.thread_ts);
+          } else if (msg.ts) {
+            // Add this message as a potential thread parent too
+            threadParents.add(msg.ts);
+          }
+        });
+        
+        // Get all thread messages for these threads
+        const threadPromises = Array.from(threadParents)
+          .map(ts => this.getThreadMessages(channelId, ts));
         
         const threadResults = await Promise.all(threadPromises);
-        const threadMessages = threadResults.flat();
-
-        // Filter thread messages by topic
-        const filteredThreadMessages = threadMessages.filter(msg => {
-          const text = msg.text.toLowerCase();
-          const searchTerms = topic.toLowerCase().split(' ');
-          return searchTerms.every(term => text.includes(term));
-        });
-
-        messages.push(...filteredThreadMessages);
+        let threadMessages = threadResults.flat();
+        
+        if (includeFullThreads) {
+          // Include all thread messages regardless of keyword match
+          console.log(`Including all ${threadMessages.length} thread messages for context enrichment`);
+          messages.push(...threadMessages);
+        } else {
+          // Only include thread messages containing the keyword
+          const filteredThreadMessages = threadMessages.filter(msg => {
+            const text = msg.text.toLowerCase();
+            const searchTerms = topic.toLowerCase().split(' ');
+            return searchTerms.every(term => text.includes(term));
+          });
+          
+          messages.push(...filteredThreadMessages);
+        }
       }
 
       // Format messages with permalinks

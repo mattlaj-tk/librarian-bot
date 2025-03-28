@@ -23,12 +23,15 @@ A Slack bot that answers questions about channel history using LLM (Large Langua
 ## Features
 
 - Search and summarize channel messages using natural language
-- Access control to ensure only channel members can query the channel
+- Access control to ensure only channel members can query channel data
 - Uses Slack's conversations API for reliable message search
 - Powered by LLM for intelligent summarization
 - Thread context analysis and related discussion linking
 - Private DM support for discreet queries
 - Client-side message filtering for precise search results
+- Detailed reporting with structured information and context
+- Conversation flow analysis that goes beyond keywords
+- Full thread inclusion for deeper context understanding
 
 ## Setup
 
@@ -85,17 +88,36 @@ For quick searches without the modal:
 /librarian search "bug fix"
 ```
 
-### 3. Thread Context
+### 3. Public Context Search
 ```
-/librarian context
+/librarian context <topic>
 ```
-When used in a thread, the bot will:
-1. Analyze the current thread discussion
-2. Find related discussions in the channel
-3. Provide additional context and links to relevant messages
-4. Help maintain conversation continuity
+When used in a channel, the bot will:
+1. Search the channel history with a broader scope to find relevant discussions
+2. Look across a wider time range than standard search
+3. Include entire conversation threads, not just messages containing the keywords
+4. Understand the meaning and flow of conversations beyond explicit keyword mentions
+5. Generate a public summary visible to everyone in the channel
+6. Include links to the most relevant previous threads and messages
 
-### 4. Direct Message Queries
+### 4. Detailed Report Generation
+```
+/librarian report <topic>
+```
+When used in a channel, the bot will:
+1. Search the channel history with the broadest scope to find all relevant discussions
+2. Analyze significantly more messages and threads (3x standard search limit)
+3. Include complete conversation threads to understand context beyond keywords
+4. Identify how ideas develop across discussions, even when search terms aren't repeated
+5. Generate a comprehensive, well-structured private report with:
+   - In-depth topic analysis and key information
+   - Sections for decisions, stakeholders, and timelines where relevant
+   - Analysis of conversation flow and implicit connections
+   - Formatted text with bullet points and headers for readability
+   - Links to all relevant discussions for easy reference
+6. The report is only visible to the person who requested it
+
+### 5. Direct Message Queries
 DM the bot directly to ask questions about channels you're a member of:
 ```
 summarize release dates from last 2 days
@@ -117,13 +139,19 @@ The bot will:
    /librarian search "bug fix" --time 7d
    ```
 
-3. **Thread Context**:
+3. **Public Context**:
    ```
-   /librarian context
+   /librarian context project timeline
    ```
-   (Must be used within a thread)
+   (Posts results publicly in the channel with full thread context)
 
-4. **Interactive Search**:
+4. **Detailed Private Report**:
+   ```
+   /librarian report quarterly goals
+   ```
+   (Sends a comprehensive report with conversation flow analysis visible only to you)
+
+5. **Interactive Search**:
    ```
    /librarian
    ```

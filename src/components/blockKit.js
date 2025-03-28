@@ -145,35 +145,23 @@ const createHelpView = () => ({
   blocks: [
     {
       type: "section",
-      text: { type: "mrkdwn", text: "*How to use the Channel Bot*" }
+      text: { type: "mrkdwn", text: "*Commands:*" }
     },
     {
       type: "section",
-      text: { type: "mrkdwn", text: "1. *Quick Search*\nJust type `/librarian` to open the search interface" }
+      text: { type: "mrkdwn", text: "1. *Private Search*\n`/librarian search <topic>`\nPerforms a quick search and shows results only to you.\n_Example: `/librarian search meeting notes`_" }
     },
     {
       type: "section",
-      text: { type: "mrkdwn", text: "2. *Direct Search*\nUse `/librarian search <topic>` for quick searches" }
+      text: { type: "mrkdwn", text: "2. *Public Context*\n`/librarian context <topic>`\nAnalyzes full conversation threads to provide comprehensive context about a topic, visible to everyone in the channel.\n_Example: `/librarian context project timeline`_" }
     },
     {
       type: "section",
-      text: { type: "mrkdwn", text: "3. *Thread Context*\nUse `/librarian context` in a thread to get related discussions" }
+      text: { type: "mrkdwn", text: "3. *Detailed Report*\n`/librarian report <topic>`\nCreates a detailed, well-structured report with full conversation context, visible only to you.\n_Example: `/librarian report quarterly goals`_" }
     },
     {
       type: "section",
-      text: { type: "mrkdwn", text: "4. *DM Queries*\nDM the bot directly for private searches" }
-    },
-    {
-      type: "divider"
-    },
-    {
-      type: "section",
-      text: { type: "mrkdwn", text: "*Tips*" },
-      fields: [
-        { type: "mrkdwn", text: "• Use quotes for exact phrases" },
-        { type: "mrkdwn", text: "• Include `--time 7d` for specific time ranges" },
-        { type: "mrkdwn", text: "• Add `--threads` to include thread messages" }
-      ]
+      text: { type: "mrkdwn", text: "4. *Help*\n`/librarian help`\nDisplays this help information." }
     }
   ]
 });
