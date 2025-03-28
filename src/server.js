@@ -17,14 +17,30 @@ console.log('- LLM_API_KEY:', process.env.LLM_API_KEY ? 'Present' : 'Missing');
 console.log('- ALLOWED_CHANNEL_IDS:', process.env.ALLOWED_CHANNEL_IDS ? `Present (${config.allowedChannels.length} channels)` : 'Missing');
 console.log('- ALLOW_ALL_PUBLIC_CHANNELS:', process.env.ALLOW_ALL_PUBLIC_CHANNELS);
 console.log('- ALLOW_PRIVATE_CHANNELS:', process.env.ALLOW_PRIVATE_CHANNELS);
+console.log('- APP_MODE:', process.env.APP_MODE || 'socket');
+console.log('- PORT:', process.env.PORT || '3000');
 console.log('- Debug Mode:', config.debugMode ? 'Enabled' : 'Disabled');
 
-const app = new App({
+// Determine if we're running in socket mode or HTTP mode
+const isSocketMode = (process.env.APP_MODE || 'socket') === 'socket';
+console.log(`Starting in ${isSocketMode ? 'Socket Mode (development)' : 'HTTP Mode (production)'}`);
+
+// Initialize the app with the appropriate configuration
+let appConfig = {
   token: process.env.SLACK_BOT_TOKEN,
   signingSecret: process.env.SLACK_SIGNING_SECRET,
-  socketMode: true,
-  appToken: process.env.SLACK_APP_TOKEN
-});
+};
+
+if (isSocketMode) {
+  // Socket Mode configuration (for development)
+  appConfig.socketMode = true;
+  appConfig.appToken = process.env.SLACK_APP_TOKEN;
+} else {
+  // HTTP Mode configuration (for production)
+  appConfig.port = parseInt(process.env.PORT || '3000');
+}
+
+const app = new App(appConfig);
 
 // Request logging middleware
 app.use(async ({ event, body, next }) => {
@@ -152,7 +168,11 @@ app.message(async ({ event, client }) => {
 (async () => {
   try {
     await app.start();
-    console.log('⚡️ Bolt app is running!');
+    if (isSocketMode) {
+      console.log('⚡️ Bolt app is running in Socket Mode!');
+    } else {
+      console.log(`⚡️ Bolt app is running in HTTP Mode on port ${appConfig.port}!`);
+    }
   } catch (error) {
     console.error('Unable to start app:', error);
   }

@@ -68,6 +68,124 @@ A Slack bot that answers questions about channel history using LLM (Large Langua
    - Install app to workspace
    - Copy Bot User OAuth Token, Signing Secret, and App Token to `.env`
 
+## Production Deployment
+
+To deploy the bot to a production server:
+
+1. **Configure Environment for HTTP Mode**:
+   ```bash
+   # In your production .env file
+   APP_MODE=http
+   PORT=3000  # Or your preferred port
+   
+   # Other required variables
+   SLACK_BOT_TOKEN=xoxb-your-bot-token
+   SLACK_SIGNING_SECRET=your-signing-secret
+   # SLACK_APP_TOKEN is only needed for Socket Mode
+   ```
+
+2. **Update Slack App Configuration**:
+   - Go to your [Slack App settings](https://api.slack.com/apps)
+   - Under "Interactivity & Shortcuts":
+     - Toggle "Interactivity" to On
+     - Set the Request URL to `https://your-domain.com/slack/events`
+   - Under "Slash Commands":
+     - For each command (e.g., `/librarian`), update the Request URL to `https://your-domain.com/slack/events`
+   - Under "Event Subscriptions":
+     - Toggle "Enable Events" to On
+     - Set the Request URL to `https://your-domain.com/slack/events`
+     - Subscribe to bot events: `message.im` (for DM support)
+
+3. **Deploy the Application**:
+   ```bash
+   # Start the application in production mode
+   npm start
+   ```
+
+4. **Using Process Managers (Recommended)**:
+   For production stability, use a process manager like PM2:
+   ```bash
+   # Install PM2
+   npm install -g pm2
+   
+   # Start the application with PM2
+   pm2 start src/server.js --name "slack-channel-bot"
+   
+   # Enable startup on system boot
+   pm2 startup
+   pm2 save
+   ```
+
+5. **Reverse Proxy Configuration**:
+   Configure Nginx or Apache as a reverse proxy to forward requests to your application:
+
+   **Nginx Example**:
+   ```nginx
+   server {
+     listen 80;
+     server_name your-domain.com;
+     
+     location / {
+       proxy_pass http://localhost:3000;
+       proxy_http_version 1.1;
+       proxy_set_header Upgrade $http_upgrade;
+       proxy_set_header Connection 'upgrade';
+       proxy_set_header Host $host;
+       proxy_cache_bypass $http_upgrade;
+     }
+   }
+   ```
+
+6. **SSL Configuration (Required)**:
+   Slack requires HTTPS for all API endpoints. Use Let's Encrypt to set up SSL:
+   ```bash
+   # Install Certbot
+   sudo apt install certbot python3-certbot-nginx
+   
+   # Generate SSL certificate
+   sudo certbot --nginx -d your-domain.com
+   ```
+
+7. **Monitoring and Logging**:
+   ```bash
+   # View logs
+   pm2 logs slack-channel-bot
+   
+   # Monitor application
+   pm2 monit
+   ```
+
+8. **Docker Deployment (Alternative)**:
+   This repository includes Docker configuration for easy deployment:
+   
+   ```bash
+   # Build and start with Docker Compose
+   docker-compose up -d
+   
+   # View logs
+   docker-compose logs -f
+   ```
+   
+   Or using Docker directly:
+   ```bash
+   # Build the Docker image
+   docker build -t slack-channel-bot .
+   
+   # Run the container
+   docker run -d --name slack-channel-bot \
+     -p 3000:3000 \
+     -e APP_MODE=http \
+     -e PORT=3000 \
+     -e SLACK_BOT_TOKEN=xoxb-your-bot-token \
+     -e SLACK_SIGNING_SECRET=your-signing-secret \
+     -e LLM_API_KEY=your-llm-api-key \
+     -e LLM_API_URL=https://api.openai.com/v1/chat/completions \
+     -e ALLOWED_CHANNEL_IDS=C0123456789,C9876543210 \
+     -e ALLOW_ALL_PUBLIC_CHANNELS=false \
+     -e ALLOW_PRIVATE_CHANNELS=true \
+     slack-channel-bot
+   ```
+
 ## Usage
 
 The bot provides an intuitive interface through slash commands and interactive components:
