@@ -4,7 +4,7 @@ const config = require('../config/config');
 class SlackApiClient {
   constructor(token) {
     this.client = new WebClient(token);
-    this.rateLimitDelay = 1000; // 1 second delay between requests
+    this.rateLimitDelay = config.search.rateLimitDelay;
     this.channelCache = new Map(); // Cache for channel name to ID mapping
   }
 
@@ -86,29 +86,33 @@ class SlackApiClient {
     }
 
     const {
-      timeRange = '24h',
-      includeThreads = true
+      includeThreads = config.search.includeThreads,
+      maxMessages = config.search.maxMessages
     } = options;
 
     try {
-      // Calculate timestamp for time range
-      const now = Math.floor(Date.now() / 1000);
-      const timeRanges = {
-        '24h': 24 * 60 * 60,
-        '7d': 7 * 24 * 60 * 60,
-        '30d': 30 * 24 * 60 * 60
-      };
-      const oldest = now - (timeRanges[timeRange] || timeRanges['24h']);
+      // Fetch messages with pagination
+      let allMessages = [];
+      let cursor = null;
+      let hasMore = true;
 
-      // Get channel history
-      const result = await this.client.conversations.history({
-        channel: channelId,
-        oldest: oldest.toString(),
-        limit: 100
-      });
+      while (hasMore && allMessages.length < maxMessages) {
+        // Respect rate limits
+        await this.sleep(this.rateLimitDelay);
+
+        const result = await this.client.conversations.history({
+          channel: channelId,
+          limit: 100,
+          cursor: cursor
+        });
+
+        allMessages.push(...result.messages);
+        cursor = result.response_metadata?.next_cursor;
+        hasMore = !!cursor;
+      }
 
       // Filter messages by topic
-      const messages = result.messages.filter(msg => {
+      const messages = allMessages.filter(msg => {
         const text = msg.text.toLowerCase();
         const searchTerms = topic.toLowerCase().split(' ');
         return searchTerms.every(term => text.includes(term));

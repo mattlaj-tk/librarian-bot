@@ -183,6 +183,128 @@ class LLMClient {
   }
 
   /**
+   * Extract topics from thread messages
+   * @param {Array} messages - Array of Slack messages
+   * @returns {Promise<string[]>} Array of up to 3 search topics
+   */
+  async extractSearchTopics(messages) {
+    if (config.debugMode) {
+      console.log('Debug mode: Bypassing LLM call');
+      return ['debug-topic-1', 'debug-topic-2', 'debug-topic-3'];
+    }
+
+    const formattedMessages = messages.map(msg => 
+      `${msg.username}: ${msg.text}`
+    ).join('\n\n');
+
+    const prompt = config.prompts.topicExtraction.replace('{text}', formattedMessages);
+    
+    const response = await this.callLLM(prompt);
+    return response.split(',').map(t => t.trim()).slice(0, 3);
+  }
+
+  /**
+   * Synthesize context from thread and related discussions
+   * @param {Array} threadMessages - Current thread messages
+   * @param {Array} relatedThreads - Array of related thread objects with messages and permalinks
+   * @returns {Promise<string>} Formatted context summary
+   */
+  async synthesizeContext(threadMessages, relatedThreads) {
+    if (config.debugMode) {
+      console.log('Debug mode: Bypassing LLM call');
+      return `[DEBUG] Here's a test context synthesis:\n\n` +
+        `Current Thread Summary:\n` +
+        threadMessages.slice(0, 2).map(msg => 
+          `- ${msg.username}: ${msg.text}`
+        ).join('\n') +
+        '\n\nRelated Threads:\n' +
+        relatedThreads.slice(0, 3).map(thread => 
+          `• ${thread.permalink} - ${thread.messages[0].text.slice(0, 100)}...`
+        ).join('\n');
+    }
+
+    const prompt = `Analyze the following thread and related discussions to provide context:
+
+Current Thread:
+${threadMessages.map(msg => `${msg.username}: ${msg.text}`).join('\n\n')}
+
+Related Discussions:
+${relatedThreads.map(thread => 
+  `Thread: ${thread.permalink}\n${thread.messages.map(msg => `${msg.username}: ${msg.text}`).join('\n\n')}`
+).join('\n\n')}
+
+Please provide:
+1. A brief summary of the current thread discussion
+2. A list of the most relevant related discussions with brief descriptions
+3. How these discussions connect to the current topic
+
+Format the response in a clear, concise way that helps maintain conversation continuity.`;
+
+    return await this.callLLM(prompt);
+  }
+
+  /**
+   * Generate concise summaries for a list of threads
+   * @param {Array} threads - Array of thread objects with messages
+   * @param {string} searchTopic - The original search topic
+   * @returns {Promise<Array>} Array of thread summaries with permalinks
+   */
+  async generateThreadSummaries(threads, searchTopic) {
+    if (config.debugMode) {
+      console.log('Debug mode: Bypassing LLM call');
+      return threads.map(thread => ({
+        permalink: thread.permalink,
+        summary: `[DEBUG] Thread about ${searchTopic} with ${thread.messages.length} messages`
+      }));
+    }
+
+    const prompt = `Analyze these Slack threads and provide a one-sentence summary for each that captures the key point or decision. Focus on what makes each thread unique and valuable.
+
+Search Topic: "${searchTopic}"
+
+Threads:
+${threads.map(thread => 
+  `Thread Messages:\n${thread.messages.map(msg => 
+    `${msg.username}: ${msg.text}`
+  ).join('\n\n')}`
+).join('\n\n---\n\n')}
+
+For each thread, provide:
+1. A one-sentence summary that captures the key point or decision
+2. The thread's permalink
+3. A relevance score (0-1) based on how directly it addresses the search topic
+
+Format each thread as:
+Summary: [one sentence]
+Link: [permalink]
+Score: [0-1]
+
+Sort threads by relevance score.`;
+
+    const response = await this.callLLM(prompt);
+    
+    // Parse the response into structured data
+    const summaries = [];
+    const threadBlocks = response.split('\n\n---\n\n');
+    
+    for (const block of threadBlocks) {
+      const summary = block.match(/Summary: (.*)/)?.[1];
+      const link = block.match(/Link: (.*)/)?.[1];
+      const score = parseFloat(block.match(/Score: (.*)/)?.[1] || '0');
+      
+      if (summary && link) {
+        summaries.push({
+          summary,
+          permalink: link,
+          relevanceScore: score
+        });
+      }
+    }
+    
+    return summaries.sort((a, b) => b.relevanceScore - a.relevanceScore);
+  }
+
+  /**
    * Clean up resources
    */
   destroy() {

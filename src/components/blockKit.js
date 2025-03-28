@@ -13,20 +13,6 @@ const createSearchModal = () => ({
     },
     {
       type: "input",
-      block_id: "time_range",
-      element: {
-        type: "radio_buttons",
-        initial_option: { text: "Last 24 hours", value: "24h" },
-        options: [
-          { text: "Last 24 hours", value: "24h" },
-          { text: "Last 7 days", value: "7d" },
-          { text: "Last 30 days", value: "30d" }
-        ]
-      },
-      label: { type: "plain_text", text: "Time Range" }
-    },
-    {
-      type: "input",
       block_id: "include_threads",
       element: { 
         type: "checkboxes",
@@ -39,39 +25,30 @@ const createSearchModal = () => ({
   close: { type: "plain_text", text: "Cancel" }
 });
 
-const createResultsView = (summary, messageCount, messages) => ({
+const createResultsView = (threadSummaries, messageCount) => ({
   type: "blocks",
   blocks: [
     {
       type: "section",
-      text: { type: "mrkdwn", text: "Here's what I found:" }
-    },
-    {
-      type: "divider"
-    },
-    {
-      type: "section",
-      text: { type: "mrkdwn", text: `*Summary*\n${summary}` },
-      accessory: {
-        type: "button",
-        text: { type: "plain_text", text: "Show Details" },
-        action_id: "show_details"
-      }
+      text: { type: "mrkdwn", text: "Here are the most relevant discussions I found:" }
     },
     {
       type: "context",
       elements: [
-        { type: "mrkdwn", text: `Found in ${messageCount} messages` }
+        { type: "mrkdwn", text: `Found in ${messageCount} messages across ${threadSummaries.length} threads` }
       ]
     },
-    ...messages.map(msg => ({
+    {
+      type: "divider"
+    },
+    ...threadSummaries.map(thread => ({
       type: "section",
-      text: { type: "mrkdwn", text: msg.text },
+      text: { type: "mrkdwn", text: thread.summary },
       accessory: {
         type: "button",
-        text: { type: "plain_text", text: "View" },
-        url: msg.permalink,
-        action_id: "view_message"
+        text: { type: "plain_text", text: "View Thread" },
+        url: thread.permalink,
+        action_id: "view_thread"
       }
     }))
   ]

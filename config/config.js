@@ -13,6 +13,14 @@ const config = {
   // Whether to allow access to private channels (false = only public channels)
   allowPrivateChannels: true,
 
+  // Search Configuration
+  search: {
+    maxMessages: 500,        // Maximum number of messages to fetch
+    maxThreads: 5,          // Maximum number of threads to show in results
+    includeThreads: true,   // Whether to include thread messages by default
+    rateLimitDelay: 1000,   // Delay between API requests (ms)
+  },
+
   // LLM Configuration
   llm: {
     maxTokens: 4000,          // GPT-3.5-turbo's context window

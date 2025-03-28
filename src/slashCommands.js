@@ -1,6 +1,7 @@
 const { createSearchModal, createResultsView, createErrorView, createHelpView } = require('./components/blockKit');
 const { searchMessages, getThreadMessages } = require('./slackApiClient');
 const { summarizeContext } = require('./llmClient');
+const config = require('./config');
 
 // Register slash command handlers with the app
 const registerSlashCommands = (app) => {
@@ -62,16 +63,12 @@ const handleSearchCommand = async (args, channel_id, user_id, client) => {
   try {
     // Parse arguments
     const options = {
-      timeRange: '24h',
-      includeThreads: true
+      includeThreads: config.search.includeThreads
     };
 
     let topic = '';
     for (let i = 0; i < args.length; i++) {
-      if (args[i] === '--time' && args[i + 1]) {
-        options.timeRange = args[i + 1];
-        i++;
-      } else if (args[i] === '--no-threads') {
+      if (args[i] === '--no-threads') {
         options.includeThreads = false;
       } else {
         topic += (topic ? ' ' : '') + args[i];
@@ -99,14 +96,32 @@ const handleSearchCommand = async (args, channel_id, user_id, client) => {
       return;
     }
 
-    // Generate summary
-    const summary = await summarizeContext(messages, topic);
+    // Group messages by thread
+    const threads = {};
+    messages.forEach(msg => {
+      const threadTs = msg.thread_ts || msg.ts;
+      if (!threads[threadTs]) {
+        threads[threadTs] = {
+          messages: [],
+          permalink: msg.permalink
+        };
+      }
+      threads[threadTs].messages.push(msg);
+    });
+
+    // Convert to array and sort by message count
+    const threadArray = Object.values(threads)
+      .sort((a, b) => b.messages.length - a.messages.length)
+      .slice(0, config.search.maxThreads); // Get top threads for summarization
+
+    // Generate thread summaries
+    const threadSummaries = await llmClient.generateThreadSummaries(threadArray, topic);
 
     // Send results
     await client.chat.postEphemeral({
       channel: channel_id,
       user: user_id,
-      ...createResultsView(summary, messages.length, messages)
+      ...createResultsView(threadSummaries, messages.length)
     });
 
   } catch (error) {
@@ -133,14 +148,52 @@ const handleContextCommand = async (channel_id, user_id, client) => {
       return;
     }
 
-    // Generate context
-    const context = await summarizeContext(threadMessages, 'thread context');
+    // Extract search topics from thread
+    const searchTopics = await llmClient.extractSearchTopics(threadMessages);
+
+    // Search for related discussions
+    const relatedThreads = await Promise.all(
+      searchTopics.map(async topic => {
+        const messages = await searchMessages(channel_id, topic, {
+          timeRange: '30d',
+          includeThreads: true
+        });
+        
+        // Group messages by thread
+        const threads = {};
+        messages.forEach(msg => {
+          const threadTs = msg.thread_ts || msg.ts;
+          if (!threads[threadTs]) {
+            threads[threadTs] = {
+              messages: [],
+              permalink: msg.permalink
+            };
+          }
+          threads[threadTs].messages.push(msg);
+        });
+
+        // Convert to array and sort by message count
+        return Object.values(threads)
+          .sort((a, b) => b.messages.length - a.messages.length)
+          .slice(0, 3); // Get top 3 threads per topic
+      })
+    );
+
+    // Flatten and deduplicate threads
+    const uniqueThreads = Array.from(
+      new Map(
+        relatedThreads.flat().map(thread => [thread.permalink, thread])
+      ).values()
+    ).slice(0, 3); // Get top 3 overall threads
+
+    // Generate context summary
+    const context = await llmClient.synthesizeContext(threadMessages, uniqueThreads);
 
     // Send results
     await client.chat.postEphemeral({
       channel: channel_id,
       user: user_id,
-      ...createResultsView(context, threadMessages.length, threadMessages)
+      ...createResultsView(context, threadMessages.length, threadMessages, uniqueThreads)
     });
 
   } catch (error) {
