@@ -25,37 +25,90 @@ const createSearchModal = () => ({
   close: { type: "plain_text", text: "Cancel" }
 });
 
-const createResultsView = (threadSummaries, messageCount) => ({
-  type: "blocks",
-  blocks: [
+const createResultsView = (threadSummaries, messageCount) => {
+  // Safety check - ensure we have valid data
+  if (!threadSummaries || !Array.isArray(threadSummaries)) {
+    console.log("Warning: Invalid threadSummaries, using fallback");
+    return {
+      blocks: [
+        {
+          type: "section",
+          text: {
+            type: "mrkdwn",
+            text: "Search results ready, but couldn't format them properly."
+          }
+        }
+      ]
+    };
+  }
+  
+  console.log("Thread summaries received:", JSON.stringify(threadSummaries, null, 2));
+  
+  // Always start with a header
+  const blocks = [
     {
       type: "section",
-      text: { type: "mrkdwn", text: "Here are the most relevant discussions I found:" }
+      text: {
+        type: "mrkdwn",
+        text: threadSummaries.length > 0 
+          ? "Here are the most relevant discussions I found:"
+          : "No relevant discussions found."
+      }
     },
     {
       type: "context",
       elements: [
-        { type: "mrkdwn", text: `Found in ${messageCount} messages across ${threadSummaries.length} threads` }
+        {
+          type: "mrkdwn",
+          text: `Found in ${messageCount || 0} messages${threadSummaries.length > 0 ? ` across ${threadSummaries.length} threads` : ''}`
+        }
       ]
-    },
-    {
+    }
+  ];
+  
+  // Only add thread summaries if we have results
+  if (threadSummaries.length > 0) {
+    // Add a divider
+    blocks.push({
       type: "divider"
-    },
-    ...threadSummaries.map(thread => ({
-      type: "section",
-      text: { type: "mrkdwn", text: thread.summary },
-      accessory: {
-        type: "button",
-        text: { type: "plain_text", text: "View Thread" },
-        url: thread.permalink,
-        action_id: "view_thread"
+    });
+    
+    // Add each thread summary (limited to 10 to avoid exceeding Slack limits)
+    threadSummaries.slice(0, 10).forEach(thread => {
+      if (thread && thread.summary) {
+        // Basic section with just text
+        const summaryBlock = {
+          type: "section",
+          text: {
+            type: "mrkdwn",
+            text: String(thread.summary).substring(0, 3000) // Truncate to avoid Slack limits
+          }
+        };
+        
+        // Add button only if we have a valid permalink
+        if (thread.permalink && typeof thread.permalink === 'string') {
+          summaryBlock.accessory = {
+            type: "button",
+            text: {
+              type: "plain_text",
+              text: "View Thread"
+            },
+            url: thread.permalink,
+            action_id: "view_thread"
+          };
+        }
+        
+        blocks.push(summaryBlock);
       }
-    }))
-  ]
-});
+    });
+  }
+  
+  console.log("Generated blocks:", JSON.stringify(blocks, null, 2));
+  
+  return { blocks };
+};
 
 const createErrorView = (error) => ({
-  type: "blocks",
   blocks: [
     {
       type: "section",
@@ -89,7 +142,6 @@ const createErrorView = (error) => ({
 });
 
 const createHelpView = () => ({
-  type: "blocks",
   blocks: [
     {
       type: "section",

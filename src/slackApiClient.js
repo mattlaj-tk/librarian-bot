@@ -91,6 +91,17 @@ class SlackApiClient {
     } = options;
 
     try {
+      // First check if we can access the channel
+      try {
+        await this.client.conversations.info({ channel: channelId });
+      } catch (error) {
+        if (error.data?.error === 'channel_not_found') {
+          console.error(`Cannot access channel ${channelId}. Bot is either not in the channel or doesn't have required permissions.`);
+          throw new Error(`The bot doesn't have access to this channel. Please add the bot to the channel by using /invite @YourBotName.`);
+        }
+        throw error; // Rethrow other errors
+      }
+      
       // Fetch messages with pagination
       let allMessages = [];
       let cursor = null;

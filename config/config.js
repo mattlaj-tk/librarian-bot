@@ -4,7 +4,8 @@ const config = {
   allowedChannels: [
     // Add your channel IDs here
     // Example: 'C0123456789'
-    'C08KR31BWDR'
+    'C08KR31BWDR',
+    'C08CH9P52C9'  // Added from error message
   ],
   
   // Whether to allow access to all public channels (false = only whitelisted channels)
@@ -23,6 +24,7 @@ const config = {
 
   // LLM Configuration
   llm: {
+    model: "gpt-3.5-turbo",
     maxTokens: 4000,          // GPT-3.5-turbo's context window
     maxResponseTokens: 500,   // Maximum tokens in response
     maxRetries: 3,           // Maximum number of retry attempts
@@ -62,7 +64,7 @@ Topics:`,
   },
 
   // Debug mode - when true, bypasses LLM and returns debug responses
-  debugMode: true,
+  debugMode: false,
 
   // Rate limiting
   rateLimits: {

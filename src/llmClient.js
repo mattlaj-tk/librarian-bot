@@ -244,6 +244,73 @@ Format the response in a clear, concise way that helps maintain conversation con
   }
 
   /**
+   * Parse a response from the LLM into structured thread summaries
+   * @param {string} response - The raw response from the LLM
+   * @param {Array} threads - Original threads (for fallback)
+   * @returns {Array} Parsed summaries
+   */
+  parseResponse(response, threads) {
+    const summaries = [];
+    
+    // Log the raw response for debugging
+    console.log("Raw LLM response:", response);
+    
+    try {
+      // First try to split by standard separators
+      const blockRegex = /Summary:\s*(.*?)\s*(?:Link|URL|Permalink):\s*(.*?)\s*(?:Score|Relevance):\s*([\d.]+)/gs;
+      let match;
+      
+      while ((match = blockRegex.exec(response)) !== null) {
+        const summary = match[1]?.trim();
+        const permalink = match[2]?.trim();
+        const score = parseFloat(match[3] || "0.5");
+        
+        if (summary) {
+          summaries.push({
+            summary,
+            permalink: permalink || threads[0]?.permalink || "https://slack.com",
+            relevanceScore: isNaN(score) ? 0.5 : score
+          });
+        }
+      }
+      
+      // If we couldn't extract any summaries, try a simpler approach
+      if (summaries.length === 0) {
+        // Split by double newlines or other common separators
+        const blocks = response.split(/\n\n+|\r\n\r\n+|---+/);
+        
+        blocks.forEach(block => {
+          const summaryMatch = block.match(/Summary:\s*(.*?)(?:\n|$)/);
+          const linkMatch = block.match(/(?:Link|URL|Permalink):\s*(.*?)(?:\n|$)/);
+          const scoreMatch = block.match(/(?:Score|Relevance):\s*([\d.]+)(?:\n|$)/);
+          
+          if (summaryMatch && summaryMatch[1]) {
+            summaries.push({
+              summary: summaryMatch[1].trim(),
+              permalink: (linkMatch && linkMatch[1]) ? linkMatch[1].trim() : (threads[0]?.permalink || "https://slack.com"),
+              relevanceScore: scoreMatch && !isNaN(parseFloat(scoreMatch[1])) ? parseFloat(scoreMatch[1]) : 0.5
+            });
+          }
+        });
+      }
+    } catch (error) {
+      console.error("Error parsing LLM response:", error);
+    }
+    
+    // If we still couldn't parse anything, use fallback summaries
+    if (summaries.length === 0) {
+      console.log("Using fallback summaries due to parsing failure");
+      return threads.slice(0, 3).map((thread, index) => ({
+        summary: `Thread with ${thread.messages?.length || 0} messages`,
+        permalink: thread.permalink || "https://slack.com",
+        relevanceScore: 0.9 - (index * 0.2)
+      }));
+    }
+    
+    return summaries;
+  }
+  
+  /**
    * Generate concise summaries for a list of threads
    * @param {Array} threads - Array of thread objects with messages
    * @param {string} searchTopic - The original search topic
@@ -252,56 +319,86 @@ Format the response in a clear, concise way that helps maintain conversation con
   async generateThreadSummaries(threads, searchTopic) {
     if (config.debugMode) {
       console.log('Debug mode: Bypassing LLM call');
-      return threads.map(thread => ({
-        permalink: thread.permalink,
-        summary: `[DEBUG] Thread about ${searchTopic} with ${thread.messages.length} messages`
-      }));
+      
+      // Create valid debug thread summaries
+      return threads.slice(0, 3).map((thread, index) => {
+        // Ensure we have valid permalink and summary
+        return {
+          summary: `[DEBUG] This is a sample thread about "${searchTopic}" with ${thread.messages?.length || 0} messages.`,
+          permalink: thread.permalink || "https://slack.com",
+          relevanceScore: 0.9 - (index * 0.2)
+        };
+      });
     }
 
-    const prompt = `Analyze these Slack threads and provide a one-sentence summary for each that captures the key point or decision. Focus on what makes each thread unique and valuable.
+    try {
+      // Before calling LLM, prepare a list of permalinks to match with threads
+      const threadPermalinks = threads.map((thread, index) => {
+        return {
+          index: index,
+          permalink: thread.permalink || `https://slack.com/thread-${index}`
+        };
+      });
+      
+      const prompt = `Analyze these Slack threads and provide a one-sentence summary for each that captures the key point or decision. Focus on what makes each thread unique and valuable.
 
 Search Topic: "${searchTopic}"
 
-Threads:
-${threads.map(thread => 
-  `Thread Messages:\n${thread.messages.map(msg => 
-    `${msg.username}: ${msg.text}`
+${threads.map((thread, index) => 
+  `Thread ${index+1}:
+Permalink: ${threadPermalinks[index].permalink}
+Messages:
+${thread.messages.map(msg => 
+    `${msg.username || 'User'}: ${msg.text || 'No text'}`
   ).join('\n\n')}`
 ).join('\n\n---\n\n')}
 
 For each thread, provide:
 1. A one-sentence summary that captures the key point or decision
-2. The thread's permalink
+2. The exact permalink as provided above (do not replace with placeholders)
 3. A relevance score (0-1) based on how directly it addresses the search topic
 
 Format each thread as:
 Summary: [one sentence]
-Link: [permalink]
+Link: [exact permalink from above]
 Score: [0-1]
 
 Sort threads by relevance score.`;
 
-    const response = await this.callLLM(prompt);
-    
-    // Parse the response into structured data
-    const summaries = [];
-    const threadBlocks = response.split('\n\n---\n\n');
-    
-    for (const block of threadBlocks) {
-      const summary = block.match(/Summary: (.*)/)?.[1];
-      const link = block.match(/Link: (.*)/)?.[1];
-      const score = parseFloat(block.match(/Score: (.*)/)?.[1] || '0');
+      console.log('Calling LLM with prompt:', prompt.substring(0, 200) + '...');
+      const response = await this.callLLM(prompt);
       
-      if (summary && link) {
-        summaries.push({
-          summary,
-          permalink: link,
-          relevanceScore: score
-        });
-      }
+      // Parse the response but also ensure permalinks are valid
+      const summaries = this.parseResponse(response, threads);
+      
+      // Validate permalinks and replace any invalid ones
+      return summaries.map((summary, index) => {
+        // Check if permalink is valid - must be a real URL, not a placeholder
+        const isValidUrl = summary.permalink && 
+                          typeof summary.permalink === 'string' && 
+                          (summary.permalink.startsWith('http://') || 
+                           summary.permalink.startsWith('https://')) &&
+                          !summary.permalink.includes('[') &&
+                          !summary.permalink.includes(']');
+        
+        // If invalid, replace with the original thread permalink
+        if (!isValidUrl) {
+          const threadIndex = Math.min(index, threads.length - 1);
+          summary.permalink = threads[threadIndex].permalink || `https://slack.com/thread-${threadIndex}`;
+        }
+        
+        return summary;
+      });
+    } catch (error) {
+      console.error('Error generating thread summaries:', error);
+      
+      // Return fallback summaries in case of error
+      return threads.slice(0, 3).map((thread, index) => ({
+        summary: `Thread about "${searchTopic}" with ${thread.messages?.length || 0} messages.`,
+        permalink: thread.permalink || "https://slack.com", 
+        relevanceScore: 0.9 - (index * 0.2)
+      }));
     }
-    
-    return summaries.sort((a, b) => b.relevanceScore - a.relevanceScore);
   }
 
   /**
@@ -315,5 +412,5 @@ Sort threads by relevance score.`;
   }
 }
 
-// Export a placeholder client that will be replaced with the actual provider implementation
-module.exports = new LLMClient(); 
+// Export the LLMClient class
+module.exports = LLMClient; 

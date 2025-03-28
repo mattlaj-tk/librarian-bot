@@ -76,6 +76,65 @@ app.error(async (error) => {
 // Register command handlers
 registerSlashCommands(app);
 
+// Register button click handlers
+app.action('view_thread', async ({ body, ack, client }) => {
+  // Acknowledge the action request
+  await ack();
+  
+  // Get user and channel info
+  const userId = body?.user?.id;
+  const channelId = body?.channel?.id;
+  const value = body?.actions?.[0]?.value; // Get URL from value
+  
+  console.log(`Thread button clicked by user ${userId} in channel ${channelId}`);
+  
+  if (value) {
+    console.log(`Button URL value: ${value}`);
+    
+    // Inform the user their action was received
+    try {
+      await client.chat.postEphemeral({
+        channel: channelId,
+        user: userId,
+        text: "Opening thread in a new tab..."
+      });
+    } catch (error) {
+      console.error('Error sending confirmation:', error);
+    }
+  } else {
+    console.log('No URL value found in button click');
+  }
+});
+
+app.action('view_related_thread', async ({ body, ack, client }) => {
+  // Acknowledge the action request
+  await ack();
+  
+  // Get user and channel info
+  const userId = body?.user?.id;
+  const channelId = body?.channel?.id;
+  const value = body?.actions?.[0]?.value; // Get URL from value
+  
+  console.log(`Related thread button clicked by user ${userId} in channel ${channelId}`);
+  
+  if (value) {
+    console.log(`Button URL value: ${value}`);
+    
+    // Inform the user their action was received
+    try {
+      await client.chat.postEphemeral({
+        channel: channelId,
+        user: userId,
+        text: "Opening related thread in a new tab..."
+      });
+    } catch (error) {
+      console.error('Error sending confirmation:', error);
+    }
+  } else {
+    console.log('No URL value found in button click');
+  }
+});
+
 // Register DM handler
 app.message(async ({ event, client }) => {
   // Only handle messages in DM channels
